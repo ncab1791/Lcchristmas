@@ -97,6 +97,31 @@
   .yes{color:var(--green);font-weight:700}
   .no{color:#8A8078}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* Ranked-choice poll */
+  .rank-help{margin:0;font-size:15px;color:var(--muted)}
+  .rank-list{display:flex;flex-direction:column;gap:8px}
+  .rank-opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;color:var(--ink);border:1.5px solid #B9AD9E;border-radius:10px;padding:8px 14px;min-height:52px;font-weight:500}
+  .rank-opt:hover{border-color:var(--red)}
+  .rank-opt[aria-pressed="true"]{border-color:var(--red);background:#FCEFEF}
+  .rank-num{flex:none;width:30px;height:30px;border-radius:50%;border:2px dashed #B9AD9E;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff}
+  .rank-opt[aria-pressed="true"] .rank-num{border:0;background:var(--red)}
+  .my-rank{margin:0;font-size:14px;color:var(--muted)}
+  .results{margin-top:24px;border-top:1px solid var(--line);padding-top:20px;display:flex;flex-direction:column;gap:12px}
+  h3{margin:0;font-family:'Playfair Display',Georgia,serif;font-size:21px;color:var(--green)}
+  .summary{margin:0;font-size:16px}
+  .summary strong{color:var(--red)}
+  .bars{display:flex;flex-direction:column;gap:12px}
+  .bar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:baseline}
+  .bar-row .lbl{font-weight:500;overflow-wrap:anywhere}
+  .bar-row .val{font-size:14px;color:var(--muted);white-space:nowrap}
+  .bar{grid-column:1/-1;height:10px;background:var(--soft);border-radius:999px;overflow:hidden}
+  .bar span{display:block;height:100%;background:var(--green);border-radius:999px}
+  .bar-row.win .bar span{background:var(--red)}
+  .bar-row.out .lbl,.bar-row.out .val{color:#8A8078;text-decoration:line-through}
+  details{font-size:15px}
+  summary{cursor:pointer;font-weight:500;color:var(--green);min-height:32px}
+  .rounds{margin:8px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:6px;color:#4A433E}
 </style>
 </head>
 <body>
@@ -226,6 +251,43 @@
       </table>
     </div>
   </section>
+
+  <section class="card" aria-labelledby="h-poll">
+    <div class="sec-head">
+      <span class="badge red" aria-hidden="true">5</span>
+      <div><h2 id="h-poll">Vote for the restaurant</h2><p class="hint">Ranked choice: tap the restaurants in order of preference.</p></div>
+    </div>
+    <p class="note" id="poll-note" hidden></p>
+    <div id="poll-body" hidden>
+      <form id="vote-form" novalidate>
+        <label class="field">Your name
+          <input type="text" id="v-name" maxlength="60" autocomplete="name">
+        </label>
+        <fieldset>
+          <legend>Your ranking</legend>
+          <p class="rank-help">Tap your favorite first, then your next choice, and so on. Rank as many as you like. Tap a ranked one again to take it out.</p>
+          <div class="rank-list" id="rank-list"></div>
+          <p class="my-rank" id="my-rank" aria-live="polite"></p>
+        </fieldset>
+        <div class="row">
+          <button type="submit" class="btn" id="v-save">Submit my vote</button>
+          <button type="button" class="ghost" id="v-clear">Clear ranking</button>
+          <button type="button" class="ghost" id="v-remove" hidden>Remove my vote</button>
+          <span class="msg" id="v-msg" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <div class="results">
+        <h3>Current results</h3>
+        <p class="summary" id="r-summary"></p>
+        <div class="bars" id="r-bars"></div>
+        <details id="r-details" hidden>
+          <summary>How the count went</summary>
+          <ol class="rounds" id="r-rounds"></ol>
+        </details>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="stripe" aria-hidden="true"></div>
@@ -348,6 +410,7 @@ var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2
         state.loaded = true;
         setNote('');
         render();
+        loadPoll(data);
       })
       .catch(function(){
         state.loaded = true;
@@ -355,6 +418,212 @@ var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2
         render();
       });
   }
+
+  /* ---------- Ranked-choice poll ---------- */
+  var poll = { options: [], ballots: [], key: null, mine: [] };
+
+  function setPollNote(text){ var n = $('poll-note'); if (text) { n.textContent = text; n.hidden = false; } else { n.hidden = true; } }
+  function setVMsg(text, isErr){ var m = $('v-msg'); m.textContent = text || ''; m.className = 'msg' + (isErr ? ' err' : ''); }
+
+  function loadPoll(data){
+    var opts = Array.isArray(data.options) ? data.options : null;
+    if (!opts) { setPollNote('Voting isn’t set up yet. Check back soon.'); $('poll-body').hidden = true; return; }
+    var seen = {};
+    opts = opts.map(function(o){ return clean(String(o), 80); }).filter(function(o){
+      if (!o || seen[o]) return false; seen[o] = true; return true;
+    }).slice(0, 15);
+    if (!opts.length) { setPollNote('Voting opens once the restaurant options are added. Check back soon.'); $('poll-body').hidden = true; return; }
+    var valid = {}; opts.forEach(function(o){ valid[o] = true; });
+    poll.ballots = (Array.isArray(data.votes) ? data.votes : []).slice(0, 500).map(function(v){
+      var s = {};
+      return (v && Array.isArray(v.ranking) ? v.ranking : []).map(String).filter(function(c){
+        if (!valid[c] || s[c]) return false; s[c] = true; return true;
+      });
+    }).filter(function(b){ return b.length; });
+
+    var key = opts.join('\n');
+    if (key !== poll.key) {
+      var first = poll.key === null;
+      poll.key = key;
+      poll.options = opts;
+      if (first && local.vote && Array.isArray(local.vote.ranking)) poll.mine = local.vote.ranking.slice();
+      poll.mine = poll.mine.filter(function(c){ return valid[c]; });
+      if (first) {
+        $('v-name').value = (local.vote && local.vote.name) || (local.answer && local.answer.name) || '';
+        if (local.vote) { $('v-save').textContent = 'Update my vote'; $('v-remove').hidden = false; }
+      }
+      buildRankList();
+    }
+    setPollNote('');
+    $('poll-body').hidden = false;
+    renderResults();
+  }
+
+  function buildRankList(){
+    var list = $('rank-list'); list.textContent = '';
+    poll.options.forEach(function(o){
+      var b = el('button', 'rank-opt'); b.type = 'button';
+      b.appendChild(el('span', 'rank-num'));
+      b.appendChild(el('span', null, o));
+      b.addEventListener('click', function(){
+        var i = poll.mine.indexOf(o);
+        if (i >= 0) poll.mine.splice(i, 1); else poll.mine.push(o);
+        updateRankMarks();
+      });
+      b.dataset.opt = o;
+      list.appendChild(b);
+    });
+    updateRankMarks();
+  }
+
+  function updateRankMarks(){
+    Array.prototype.forEach.call($('rank-list').children, function(b){
+      var o = b.dataset.opt, i = poll.mine.indexOf(o);
+      b.setAttribute('aria-pressed', i >= 0 ? 'true' : 'false');
+      b.firstChild.textContent = i >= 0 ? String(i + 1) : '';
+      b.setAttribute('aria-label', i >= 0 ? o + ', ranked number ' + (i + 1) + '. Tap to remove.' : o + ', not ranked. Tap to rank next.');
+    });
+    $('my-rank').textContent = poll.mine.length
+      ? 'Your order: ' + poll.mine.map(function(o, i){ return (i + 1) + '. ' + o; }).join('   ')
+      : 'Nothing ranked yet.';
+  }
+
+  // Instant-runoff count. Each round, every ballot counts for its highest choice still in the race.
+  // A choice with more than half of those votes wins; otherwise the last-place choice(s) are dropped.
+  function countIRV(options, ballots){
+    var active = options.slice(), rounds = [];
+    while (active.length) {
+      var counts = {}, exhausted = 0, total = 0;
+      active.forEach(function(o){ counts[o] = 0; });
+      ballots.forEach(function(b){
+        for (var i = 0; i < b.length; i++) { if (counts.hasOwnProperty(b[i])) { counts[b[i]]++; total++; return; } }
+        exhausted++;
+      });
+      var round = { counts: counts, active: active.slice(), total: total, exhausted: exhausted, eliminated: [] };
+      rounds.push(round);
+      if (!total) return { rounds: rounds, winner: null, tie: [] };
+      var vals = active.map(function(o){ return counts[o]; });
+      var max = Math.max.apply(null, vals), min = Math.min.apply(null, vals);
+      if (max * 2 > total || active.length === 1) {
+        return { rounds: rounds, winner: active.filter(function(o){ return counts[o] === max; })[0], tie: [] };
+      }
+      var lowest = active.filter(function(o){ return counts[o] === min; });
+      if (lowest.length === active.length) return { rounds: rounds, winner: null, tie: active.slice() };
+      round.eliminated = lowest;
+      active = active.filter(function(o){ return lowest.indexOf(o) < 0; });
+    }
+    return { rounds: rounds, winner: null, tie: [] };
+  }
+
+  function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+
+  function renderResults(){
+    var n = poll.ballots.length;
+    var res = countIRV(poll.options, poll.ballots);
+    var last = res.rounds[res.rounds.length - 1];
+    var summary = $('r-summary'); summary.textContent = '';
+    if (!n) {
+      summary.textContent = 'No votes yet. Be the first!';
+    } else if (res.winner) {
+      summary.appendChild(document.createTextNode('Leading: '));
+      summary.appendChild(el('strong', null, res.winner));
+      var w = last.counts[res.winner];
+      summary.appendChild(document.createTextNode(' with ' + w + ' of ' + last.total + ' votes in the final round (' + Math.round(w * 100 / last.total) + '%). ' + plural(n, 'ballot', 'ballots') + ' cast.'));
+    } else if (res.tie.length) {
+      summary.textContent = 'It’s a tie between ' + res.tie.join(' and ') + '. ' + plural(n, 'ballot', 'ballots') + ' cast.';
+    }
+
+    // Bars: everyone's standing in the final round; options dropped earlier are struck through.
+    var bars = $('r-bars'); bars.textContent = '';
+    if (n) {
+      var stillIn = last.active;
+      var ordered = stillIn.slice().sort(function(a, b){ return last.counts[b] - last.counts[a]; });
+      var dropped = [];
+      for (var r = res.rounds.length - 1; r >= 0; r--) dropped = dropped.concat(res.rounds[r].eliminated);
+      ordered.concat(dropped).forEach(function(o){
+        var out = stillIn.indexOf(o) < 0;
+        var v = out ? 0 : last.counts[o];
+        var row = el('div', 'bar-row' + (o === res.winner ? ' win' : '') + (out ? ' out' : ''));
+        row.appendChild(el('span', 'lbl', o));
+        row.appendChild(el('span', 'val', out ? 'out' : plural(v, 'vote', 'votes')));
+        var bar = el('div', 'bar'); var fill = el('span');
+        fill.style.width = (out || !last.total ? 0 : Math.round(v * 100 / last.total)) + '%';
+        bar.appendChild(fill); row.appendChild(bar);
+        bars.appendChild(row);
+      });
+    }
+
+    var list = $('r-rounds'); list.textContent = '';
+    if (n && res.rounds.length) {
+      res.rounds.forEach(function(rd){
+        var parts = rd.active.slice().sort(function(a, b){ return rd.counts[b] - rd.counts[a]; })
+          .map(function(o){ return o + ' ' + rd.counts[o]; }).join(', ');
+        var text = parts + '.';
+        if (rd.eliminated.length) text += ' Out: ' + rd.eliminated.join(', ') + '.';
+        if (rd.exhausted) text += ' (' + plural(rd.exhausted, 'ballot', 'ballots') + ' had no choices left.)';
+        list.appendChild(el('li', null, text));
+      });
+      $('r-details').hidden = false;
+    } else {
+      $('r-details').hidden = true;
+    }
+  }
+
+  var voteErrors = {
+    busy: 'Lots of people are voting at once. Please try again.',
+    full: 'The vote list is full. Please let the organizer know.',
+    missing_name: 'Please add your name.',
+    empty_ranking: 'Tap at least one restaurant to rank it.',
+    poll_closed: 'Voting isn’t open right now.'
+  };
+
+  $('vote-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    if (!configured) return;
+    var name = clean($('v-name').value, 60);
+    if (!name) { setVMsg(voteErrors.missing_name, true); $('v-name').focus(); return; }
+    if (!poll.mine.length) { setVMsg(voteErrors.empty_ranking, true); return; }
+    var ranking = poll.mine.slice();
+    var btn = $('v-save'); btn.disabled = true; setVMsg('Saving…');
+    post({ token: local.token, action: 'vote', name: name, ranking: ranking })
+      .then(function(res){
+        if (!res || !res.ok) { setVMsg(voteErrors[res && res.error] || 'Couldn’t save your vote. Please try again.', true); return; }
+        local.vote = { name: name, ranking: ranking }; saveLocal(local);
+        setVMsg('Vote saved. Thanks, ' + name + '!');
+        btn.textContent = 'Update my vote';
+        $('v-remove').hidden = false;
+        return load();
+      })
+      .catch(function(){ setVMsg('Couldn’t save your vote. Please try again.', true); })
+      .then(function(){ btn.disabled = false; });
+  });
+
+  $('v-clear').addEventListener('click', function(){ poll.mine = []; updateRankMarks(); setVMsg(''); });
+
+  var voteConfirmTimer = null;
+  $('v-remove').addEventListener('click', function(){
+    var b = $('v-remove');
+    if (!b.classList.contains('confirm')) {
+      b.classList.add('confirm'); b.textContent = 'Tap again to remove';
+      clearTimeout(voteConfirmTimer);
+      voteConfirmTimer = setTimeout(function(){ b.classList.remove('confirm'); b.textContent = 'Remove my vote'; }, 4000);
+      return;
+    }
+    clearTimeout(voteConfirmTimer);
+    b.disabled = true; setVMsg('Removing…');
+    post({ token: local.token, action: 'unvote' })
+      .then(function(res){
+        if (!res || !res.ok) throw new Error('bad');
+        delete local.vote; saveLocal(local);
+        poll.mine = []; updateRankMarks();
+        $('v-save').textContent = 'Submit my vote';
+        b.hidden = true;
+        setVMsg('Your vote was removed.');
+        return load();
+      })
+      .catch(function(){ setVMsg('Couldn’t remove your vote. Please try again.', true); })
+      .then(function(){ b.disabled = false; b.classList.remove('confirm'); b.textContent = 'Remove my vote'; });
+  });
 
   function post(payload){
     return fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
@@ -413,6 +682,7 @@ var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2
   });
 
   if (!configured) setNote('Not connected yet: paste your Google Apps Script URL into SCRIPT_URL in this file.');
+  setPollNote(configured ? 'Loading the poll…' : 'Voting will appear here once the page is connected.');
   prefill();
   render();
   load();

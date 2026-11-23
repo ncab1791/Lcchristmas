@@ -1,7 +1,8 @@
 # Christmas Dinner Sign-Up
 
 A festive sign-up page for our Christmas dinner. Guests pick the date that works
-(Sunday, Dec 13 or Sunday, Dec 27) and suggest restaurants. No accounts needed.
+(Sunday, Dec 13 or Sunday, Dec 27), suggest restaurants, and rank the approved
+restaurants in a ranked-choice poll. No accounts needed.
 
 - `index.html`: the page, served by GitHub Pages.
 - `apps-script.gs`: a small Google Apps Script that saves answers to a Google Sheet.
@@ -28,3 +29,17 @@ The page picks it up within a minute or two.
 Answers appear in the sheet's **Responses** tab. To remove someone, delete their
 row. If you change the script later, use **Deploy → Manage deployments → Edit →
 New version** so the URL stays the same.
+
+## Restaurant poll (ranked choice)
+
+- The script creates a **Poll Options** tab. Type each approved restaurant in
+  column A, one per row, under the header (up to 15). The page shows exactly
+  these; while the tab is empty, voting stays hidden.
+- Each voter ranks as many options as they like. Rankings land in the **Votes**
+  tab; delete a row to remove a vote.
+- The page counts the votes live with instant runoff: each round, every ballot
+  counts for its highest choice still in the race. An option with more than half
+  of those votes wins; otherwise the last-place option is dropped (options tied
+  for last are dropped together) and the count repeats.
+- Renaming an option in **Poll Options** drops it from existing ballots, so
+  settle the names before sharing the poll.
