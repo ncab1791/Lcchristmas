@@ -43,3 +43,6 @@ New version** so the URL stays the same.
   for last are dropped together) and the count repeats.
 - Renaming an option in **Poll Options** drops it from existing ballots, so
   settle the names before sharing the poll.
+- To close voting, set `var POLL_CLOSED = true;` near the bottom of
+  `index.html`. The form disappears, the results become final, and the winner
+  shows in the "Where" box at the top of the page.

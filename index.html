@@ -98,6 +98,18 @@
   .no{color:#8A8078}
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
+  [hidden]{display:none !important}
+
+  /* Event details box */
+  .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;background:var(--paper);border:3px double var(--red);border-radius:14px;padding:22px 24px}
+  .detail{display:flex;align-items:flex-start;gap:14px;min-width:0}
+  .dicon{flex:none;width:44px;height:44px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center}
+  .dtext{display:flex;flex-direction:column;min-width:0}
+  .dlabel{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .dval{font-family:'Playfair Display',Georgia,serif;font-size:24px;line-height:1.2;color:var(--red);overflow-wrap:anywhere}
+  .dsub{font-weight:700;color:var(--green)}
+  @media (max-width:560px){.details{grid-template-columns:minmax(0,1fr)}}
+
   /* Ranked-choice poll */
   .rank-help{margin:0;font-size:15px;color:var(--muted)}
   .rank-list{display:flex;flex-direction:column;gap:8px}
@@ -170,13 +182,71 @@
     <h1>Christmas Dinner</h1>
     <svg class="star b" width="15" height="15" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0 -10 L2.4 -2.4 L10 0 L2.4 2.4 L0 10 L-2.4 2.4 L-10 0 L-2.4 -2.4 Z" fill="#B8862B"/></svg>
   </div>
-  <p class="sub">Good food, good company and plenty of holiday cheer. Help us pick the date and the place!</p>
+  <p class="sub">Good food, good company and plenty of holiday cheer. Help us pick the place!</p>
 </header>
 
 <main>
-  <section class="card" aria-labelledby="h-dates">
+
+  <section class="details" aria-labelledby="h-details">
+    <h2 id="h-details" class="sr">Event details</h2>
+    <div class="detail">
+      <span class="dicon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FBF7EF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+      <div class="dtext">
+        <span class="dlabel">When</span>
+        <span class="dval">Sunday, December 13</span>
+        <span class="dsub">6:30 PM</span>
+      </div>
+    </div>
+    <div class="detail">
+      <span class="dicon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FBF7EF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+      <div class="dtext">
+        <span class="dlabel">Where</span>
+        <span class="dval" id="where-val">To be picked by vote</span>
+        <span class="dsub" id="where-sub">Rank your favorites below.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-poll">
     <div class="sec-head">
       <span class="badge red" aria-hidden="true">1</span>
+      <div><h2 id="h-poll">Vote for the restaurant</h2><p class="hint" id="poll-hint">Ranked choice: tap the restaurants in order of preference.</p></div>
+    </div>
+    <p class="note" id="poll-note" hidden></p>
+    <div id="poll-body" hidden>
+      <form id="vote-form" novalidate>
+        <label class="field">Your name
+          <input type="text" id="v-name" maxlength="60" autocomplete="name">
+        </label>
+        <fieldset>
+          <legend>Your ranking</legend>
+          <p class="rank-help">Tap your favorite first, then your next choice, and so on. Rank as many as you like. Tap a ranked one again to take it out.</p>
+          <div class="rank-list" id="rank-list"></div>
+          <p class="my-rank" id="my-rank" aria-live="polite"></p>
+        </fieldset>
+        <div class="row">
+          <button type="submit" class="btn" id="v-save">Submit my vote</button>
+          <button type="button" class="ghost" id="v-clear">Clear ranking</button>
+          <button type="button" class="ghost" id="v-remove" hidden>Remove my vote</button>
+          <span class="msg" id="v-msg" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <div class="results">
+        <h3 id="r-heading">Current results</h3>
+        <p class="summary" id="r-summary"></p>
+        <div class="bars" id="r-bars"></div>
+        <details id="r-details" hidden>
+          <summary>How the count went</summary>
+          <ol class="rounds" id="r-rounds"></ol>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-dates">
+    <div class="sec-head">
+      <span class="badge" aria-hidden="true">2</span>
       <div><h2 id="h-dates">Which date works best?</h2><p class="hint">Live tally of everyone's answers.</p></div>
     </div>
     <div class="dates">
@@ -195,7 +265,7 @@
 
   <section class="card" aria-labelledby="h-form">
     <div class="sec-head">
-      <span class="badge" aria-hidden="true">2</span>
+      <span class="badge red" aria-hidden="true">3</span>
       <div><h2 id="h-form">Sign up</h2><p class="hint">Add your name, pick the dates you can make, and suggest a restaurant or two.</p></div>
     </div>
     <p class="note" id="access-note" hidden></p>
@@ -228,7 +298,7 @@
 
   <section class="card" aria-labelledby="h-who">
     <div class="sec-head">
-      <span class="badge red" aria-hidden="true">3</span>
+      <span class="badge" aria-hidden="true">4</span>
       <div><h2 id="h-who">Who's in</h2><p class="hint" id="who-hint">Everyone who has signed up so far.</p></div>
     </div>
     <div class="tbl-wrap">
@@ -241,7 +311,7 @@
 
   <section class="card" aria-labelledby="h-places">
     <div class="sec-head">
-      <span class="badge" aria-hidden="true">4</span>
+      <span class="badge red" aria-hidden="true">5</span>
       <div><h2 id="h-places">Restaurant suggestions</h2><p class="hint">Every idea so far. We'll pick a favorite.</p></div>
     </div>
     <div class="tbl-wrap">
@@ -251,43 +321,6 @@
       </table>
     </div>
   </section>
-
-  <section class="card" aria-labelledby="h-poll">
-    <div class="sec-head">
-      <span class="badge red" aria-hidden="true">5</span>
-      <div><h2 id="h-poll">Vote for the restaurant</h2><p class="hint">Ranked choice: tap the restaurants in order of preference.</p></div>
-    </div>
-    <p class="note" id="poll-note" hidden></p>
-    <div id="poll-body" hidden>
-      <form id="vote-form" novalidate>
-        <label class="field">Your name
-          <input type="text" id="v-name" maxlength="60" autocomplete="name">
-        </label>
-        <fieldset>
-          <legend>Your ranking</legend>
-          <p class="rank-help">Tap your favorite first, then your next choice, and so on. Rank as many as you like. Tap a ranked one again to take it out.</p>
-          <div class="rank-list" id="rank-list"></div>
-          <p class="my-rank" id="my-rank" aria-live="polite"></p>
-        </fieldset>
-        <div class="row">
-          <button type="submit" class="btn" id="v-save">Submit my vote</button>
-          <button type="button" class="ghost" id="v-clear">Clear ranking</button>
-          <button type="button" class="ghost" id="v-remove" hidden>Remove my vote</button>
-          <span class="msg" id="v-msg" role="status" aria-live="polite"></span>
-        </div>
-      </form>
-
-      <div class="results">
-        <h3>Current results</h3>
-        <p class="summary" id="r-summary"></p>
-        <div class="bars" id="r-bars"></div>
-        <details id="r-details" hidden>
-          <summary>How the count went</summary>
-          <ol class="rounds" id="r-rounds"></ol>
-        </details>
-      </div>
-    </div>
-  </section>
 </main>
 
 <div class="stripe" aria-hidden="true"></div>
@@ -295,6 +328,8 @@
 <script>
 /* ===== SETUP: paste your Google Apps Script Web app URL here (it ends in /exec) ===== */
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2BmWOyQrpog5zBoaDo-DFxyW9h-EX4o8x5_z5QUGtFf8Ie/exec';
+/* Restaurant poll: change to true to close voting. The winner then shows in the "Where" box. */
+var POLL_CLOSED = false;
 /* ================================================================================== */
 
 (function(){
@@ -456,6 +491,11 @@ var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2
     }
     setPollNote('');
     $('poll-body').hidden = false;
+    if (POLL_CLOSED) {
+      $('vote-form').hidden = true;
+      $('r-heading').textContent = 'Final results';
+      $('poll-hint').textContent = 'Voting is closed. Thanks to everyone who voted!';
+    }
     renderResults();
   }
 
@@ -525,7 +565,7 @@ var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2
     if (!n) {
       summary.textContent = 'No votes yet. Be the first!';
     } else if (res.winner) {
-      summary.appendChild(document.createTextNode('Leading: '));
+      summary.appendChild(document.createTextNode(POLL_CLOSED ? 'Winner: ' : 'Leading: '));
       summary.appendChild(el('strong', null, res.winner));
       var w = last.counts[res.winner];
       summary.appendChild(document.createTextNode(' with ' + w + ' of ' + last.total + ' votes in the final round (' + Math.round(w * 100 / last.total) + '%). ' + plural(n, 'ballot', 'ballots') + ' cast.'));
@@ -551,6 +591,22 @@ var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2
         bar.appendChild(fill); row.appendChild(bar);
         bars.appendChild(row);
       });
+    }
+
+    // "Where" box at the top
+    var whereVal = $('where-val'), whereSub = $('where-sub');
+    if (POLL_CLOSED && res.winner) {
+      whereVal.textContent = res.winner;
+      whereSub.textContent = 'Picked by ranked-choice vote';
+    } else if (POLL_CLOSED && res.tie.length) {
+      whereVal.textContent = 'Tie: ' + res.tie.join(' and ');
+      whereSub.textContent = 'The organizer will make the final call.';
+    } else if (POLL_CLOSED) {
+      whereVal.textContent = 'To be announced';
+      whereSub.textContent = '';
+    } else {
+      whereVal.textContent = 'To be picked by vote';
+      whereSub.textContent = res.winner ? 'Currently leading: ' + res.winner : (res.tie.length ? 'Currently tied: ' + res.tie.join(' and ') : 'Rank your favorites below.');
     }
 
     var list = $('r-rounds'); list.textContent = '';
