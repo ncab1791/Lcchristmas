@@ -330,6 +330,8 @@
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby7UZ2WPtFi64pRDhB6Af2BmWOyQrpog5zBoaDo-DFxyW9h-EX4o8x5_z5QUGtFf8Ie/exec';
 /* Restaurant poll: change to true to close voting. The winner then shows in the "Where" box. */
 var POLL_CLOSED = false;
+/* While voting is open, results and the current leader stay hidden until this many votes are in. */
+var MIN_VOTES_TO_SHOW = 9;
 /* ================================================================================== */
 
 (function(){
@@ -555,6 +557,7 @@ var POLL_CLOSED = false;
     return { rounds: rounds, winner: null, tie: [] };
   }
 
+  function joinNames(a){ return a.length < 3 ? a.join(' and ') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
   function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
 
   function renderResults(){
@@ -562,6 +565,19 @@ var POLL_CLOSED = false;
     var res = countIRV(poll.options, poll.ballots);
     var last = res.rounds[res.rounds.length - 1];
     var summary = $('r-summary'); summary.textContent = '';
+
+    // Keep results private until enough votes are in (only while voting is open).
+    if (!POLL_CLOSED && n < MIN_VOTES_TO_SHOW) {
+      summary.textContent = 'Results will appear once ' + MIN_VOTES_TO_SHOW + ' votes are in. '
+        + (n ? plural(n, 'vote', 'votes') + ' so far.' : 'No votes yet. Be the first!');
+      $('r-bars').textContent = '';
+      $('r-rounds').textContent = '';
+      $('r-details').hidden = true;
+      $('where-val').textContent = 'To be picked by vote';
+      $('where-sub').textContent = 'Rank your favorites below.';
+      return;
+    }
+
     if (!n) {
       summary.textContent = 'No votes yet. Be the first!';
     } else if (res.winner) {
@@ -570,7 +586,7 @@ var POLL_CLOSED = false;
       var w = last.counts[res.winner];
       summary.appendChild(document.createTextNode(' with ' + w + ' of ' + last.total + ' votes in the final round (' + Math.round(w * 100 / last.total) + '%). ' + plural(n, 'ballot', 'ballots') + ' cast.'));
     } else if (res.tie.length) {
-      summary.textContent = 'It’s a tie between ' + res.tie.join(' and ') + '. ' + plural(n, 'ballot', 'ballots') + ' cast.';
+      summary.textContent = 'It’s a tie between ' + joinNames(res.tie) + '. ' + plural(n, 'ballot', 'ballots') + ' cast.';
     }
 
     // Bars: everyone's standing in the final round; options dropped earlier are struck through.
@@ -599,14 +615,14 @@ var POLL_CLOSED = false;
       whereVal.textContent = res.winner;
       whereSub.textContent = 'Picked by ranked-choice vote';
     } else if (POLL_CLOSED && res.tie.length) {
-      whereVal.textContent = 'Tie: ' + res.tie.join(' and ');
+      whereVal.textContent = 'Tie: ' + joinNames(res.tie);
       whereSub.textContent = 'The organizer will make the final call.';
     } else if (POLL_CLOSED) {
       whereVal.textContent = 'To be announced';
       whereSub.textContent = '';
     } else {
       whereVal.textContent = 'To be picked by vote';
-      whereSub.textContent = res.winner ? 'Currently leading: ' + res.winner : (res.tie.length ? 'Currently tied: ' + res.tie.join(' and ') : 'Rank your favorites below.');
+      whereSub.textContent = res.winner ? 'Currently leading: ' + res.winner : (res.tie.length ? 'Currently tied: ' + joinNames(res.tie) : 'Rank your favorites below.');
     }
 
     var list = $('r-rounds'); list.textContent = '';
