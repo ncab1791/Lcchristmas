@@ -566,11 +566,26 @@ var MIN_VOTES_TO_SHOW = 9;
     var last = res.rounds[res.rounds.length - 1];
     var summary = $('r-summary'); summary.textContent = '';
 
-    // Keep results private until enough votes are in (only while voting is open).
+    // Until enough votes are in (and while voting is open), show first-choice standings only:
+    // no leader called, no runoff rounds, nothing marked as out.
     if (!POLL_CLOSED && n < MIN_VOTES_TO_SHOW) {
-      summary.textContent = 'Results will appear once ' + MIN_VOTES_TO_SHOW + ' votes are in. '
-        + (n ? plural(n, 'vote', 'votes') + ' so far.' : 'No votes yet. Be the first!');
-      $('r-bars').textContent = '';
+      summary.textContent = n
+        ? plural(n, 'vote', 'votes') + ' so far. These are first choices only. The ranked-choice count starts once ' + MIN_VOTES_TO_SHOW + ' votes are in.'
+        : 'No votes yet. Be the first!';
+      var fb = $('r-bars'); fb.textContent = '';
+      if (n) {
+        var first = res.rounds[0];
+        poll.options.slice().sort(function(a, b){ return (first.counts[b] || 0) - (first.counts[a] || 0); }).forEach(function(o){
+          var v = first.counts[o] || 0;
+          var row = el('div', 'bar-row');
+          row.appendChild(el('span', 'lbl', o));
+          row.appendChild(el('span', 'val', plural(v, 'first-choice vote', 'first-choice votes')));
+          var bar = el('div', 'bar'); var fill = el('span');
+          fill.style.width = (first.total ? Math.round(v * 100 / first.total) : 0) + '%';
+          bar.appendChild(fill); row.appendChild(bar);
+          fb.appendChild(row);
+        });
+      }
       $('r-rounds').textContent = '';
       $('r-details').hidden = true;
       $('where-val').textContent = 'To be picked by vote';
